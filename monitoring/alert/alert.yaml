@@ -1,0 +1,42 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  namespace: monitoring
+  name: httpbin-cpu-alert
+  labels:
+    prometheus: main
+spec:
+  groups:
+  - name: httpbin-cpu-usage
+    rules:
+    - alert: HighCpuUsageHttpbin
+      expr: |
+        sum(rate(container_cpu_usage_seconds_total{container_label_name="httpbin"}[1m]))/sum(container_spec_cpu_quota{container_label_name="httpbin"}/container_spec_cpu_period{container_label_name="httpbin"}) >= 0.8
+      for: 5s
+      labels:
+        severity: warning
+      annotations:
+        summary: High CPU usage detected for httpbin
+        description: "Container httpbin is using more than 90% of its allocated CPU limit for over 5 seconds."
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: main
+  name: httpbin-memory-alert
+  namespace: monitoring  # Adjust to the namespace where your Prometheus Operator is installed
+spec:
+  groups:
+  - name: httpbin-memory-usage
+    rules:
+    - alert: HighMemoryUsageHttpbin
+      expr: |
+        sum(container_memory_usage_bytes{container_label_name="httpbin"})/sum(container_spec_memory_limit_bytes{container_label_name="httpbin"}) > 0.8
+      for: 5s
+      labels:
+        severity: warning
+      annotations:
+        summary: High Memory usage detected for httpbin
+        description: "Container httpbin is using more than 90% of its allocated memory limit for over 5 seconds."

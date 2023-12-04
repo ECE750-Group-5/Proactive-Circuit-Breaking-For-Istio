@@ -10,19 +10,19 @@ class Event:
         self.current_state = current_state
         self.metrics = metrics
         self.service_name = service_name
-
+    
+    def __str__(self) -> str:
+        return f"Event(timestamp={self.timestamp}, current_state={self.current_state}, metrics={self.metrics}, service_name={self.service_name})"
 
 class EventFactory:
-    def __init__(self, prometheus_url) -> None:
-        self.metrics_querier = MetricsQuerier(prometheus_url)
+    def __init__(self) -> None:
+        pass
 
     def create_event(self, service_name, current_state):
-        cpu_usage_percentage, memory_usage_percentage, non_500_non_0_latency_seconds, non_500_non_0_arrival_rate = self.metrics_querier.query_metrics(service_name)
+        cpu_usage_percentage, memory_usage_percentage = MetricsQuerier.query_cpu_and_memory_usage_percentage(service_name)
         metrics = {
             MetricsQuerier.CPU_USAGE_PERCENTAGE: cpu_usage_percentage,
             MetricsQuerier.MEMORY_USAGE_PERCENTAGE: memory_usage_percentage,
-            MetricsQuerier.NON_500_NON_0_LATENCY: non_500_non_0_latency_seconds,
-            MetricsQuerier.NON_500_NON_0_ARRIVAL_RATE: non_500_non_0_arrival_rate
         }
         return Event(current_state, metrics, service_name)
         

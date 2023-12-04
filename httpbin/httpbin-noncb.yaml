@@ -18,44 +18,44 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: httpbin
+  name: httpbin-noncb
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: httpbin
+  name: httpbin-noncb
   labels:
-    app: httpbin
-    service: httpbin
+    app: httpbin-noncb
+    service: httpbin-noncb
 spec:
   ports:
   - name: http
     port: 8000
     targetPort: 80
   selector:
-    app: httpbin
+    app: httpbin-noncb
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: httpbin
+  name: httpbin-noncb
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: httpbin
+      app: httpbin-noncb
       version: v1
   template:
     metadata:
       labels:
-        app: httpbin
+        app: httpbin-noncb
         version: v1
     spec:
-      serviceAccountName: httpbin
+      serviceAccountName: httpbin-noncb
       containers:
       - image: docker.io/kong/httpbin
         imagePullPolicy: IfNotPresent
-        name: httpbin
+        name: httpbin-noncb
         ports:
         - containerPort: 80
         resources:

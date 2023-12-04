@@ -1,6 +1,6 @@
 minikube start --cpus=4
 kubectl apply -f monitoring/prometheus-operator/namespace.yaml
-kubectl apply -f monitoring/prometheus-operator/crds
+kubectl create -f monitoring/prometheus-operator/crds 
 kubectl apply -f monitoring/prometheus-operator/rbac
 kubectl apply -f monitoring/prometheus-operator/deployment
 istioctl install --set profile=demo -y

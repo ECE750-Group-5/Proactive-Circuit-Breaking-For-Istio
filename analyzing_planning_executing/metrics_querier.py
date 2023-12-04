@@ -4,21 +4,36 @@ import logging
 
 
 class MetricsQuerier:
+    """
+    A class for querying metrics from a Prometheus server.
+
+    Attributes:
+        CPU_USAGE_PERCENTAGE (str): Constant for CPU usage percentage metric.
+        MEMORY_USAGE_PERCENTAGE (str): Constant for memory usage percentage metric.
+        NON_500_PERCENTAGE (str): Constant for non-500 rate metric.
+        P99_LATENCY_SECONDS (str): Constant for p99 latency metric.
+
+    Methods:
+        __init__(prometheus_url: str): Initializes a MetricsQuerier object.
+        _query_metrics(query: str) -> float: Queries metrics from the Prometheus server.
+        query_cpu_usage_percentage(service_name: str) -> float: Queries the CPU usage percentage metric.
+        query_memory_usage_percentage(service_name: str) -> float: Queries the memory usage percentage metric.
+        query_non_500_percentage(service_name: str) -> float: Queries the non-500 rate metric.
+        query_p99_latency_seconds(service_name) -> float: Queries the p99 latency metric.
+        query_metrics(service_name: str) -> List[float]: Queries all metrics for a given service.
+    """
+
     CPU_USAGE_PERCENTAGE = 'cpu_usage_percentage'
     MEMORY_USAGE_PERCENTAGE = 'memory_usage_percentage'
-    NON_500_PERCENTAGE = 'non_500_percentage'
-    P99_LATENCY_SECONDS = 'p99_latency_seconds'
-    def __init__(self, prometheus_url: str) -> None:
-        """
-        Initializes a MetricsQuerier object.
+    NON_500_NON_0_LATENCY = 'non_500_non_0_latency'
+    NON_500_NON_0_ARRIVAL_RATE = 'non_500_non_0_arrival_rate'
+    PROMETHEUS_URL = 'http://localhost:9090/api/v1/query'
 
-        Args:
-            service_names (list): List of service names.
-            prometheus_url (str): URL of the Prometheus server.
-        """
-        self.prometheus_url = prometheus_url
+    def __init__(self) -> None:
+        pass
     
-    def _query_metrics(self, query: str) -> float:
+    @staticmethod
+    def _query_metrics(query: str) -> float:
         """
         Queries metrics from the Prometheus server.
 
@@ -29,10 +44,10 @@ class MetricsQuerier:
             float: Result of the query as a float value.
         """
         try:
-            logging.info(f"Querying {query}")
-            response = requests.get(self.prometheus_url, params={'query': query})
+            logging.debug(f"Querying {query}")
+            response = requests.get(MetricsQuerier.PROMETHEUS_URL, params={'query': query})
             response.raise_for_status()  # This will raise an exception for HTTP errors
-            logging.info(f"Response: {response.json()}")
+            logging.debug(f"Response: {response.json()}")
             data = response.json()["data"]["result"][0]
             return float(data["value"][1])
         except requests.exceptions.HTTPError as errh:
@@ -43,58 +58,74 @@ class MetricsQuerier:
             print ("Timeout Error:", errt)
         except requests.exceptions.RequestException as err:
             print ("Oops: Something Else", err)
-
-    def query_cpu_usage_percentage(self, service_name: str) -> float:
-            """
-            Queries the CPU usage percentage metric.
-
-            Args:
-                service_name str: The name of the service.
-
-            Returns:
-                float: CPU usage percentage in [0, 1].
-            """
-            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_name="{service_name}"}}[1m]))/sum(container_spec_cpu_quota{{container_label_name="{service_name}"}}/container_spec_cpu_period{{container_label_name="{service_name}"}})'
-            return self._query_metrics(query)
-            
-
     
-    def query_memory_usage_percentage(self, service_name: str) -> float:
+    @staticmethod
+    def query_cpu_usage_percentage(service_name: str) -> float:
         """
-        Queries the memory usage percentage metric.
-
-        Returns:
-            float: Memory usage percentage in [0, 1].
-        """
-        query = f'sum(container_memory_usage_bytes{{container_label_name="{service_name}"}}) / sum(container_spec_memory_limit_bytes{{container_label_name="{service_name}"}})'
-        return self._query_metrics(query)
-
-
-    def query_non_500_percentage(self, service_name: str) -> float:
-        """
-        Queries the non-500 rate metric.
+        Queries the CPU usage percentage metric.
 
         Args:
             service_name (str): The name of the service.
 
         Returns:
-            float: Non-500 percentage, with one decimal, for example, 92.5%.
+            float: CPU usage percentage in [0, 1].
         """
-        query = f'sum(irate(istio_requests_total{{connection_security_policy="mutual_tls", reporter="destination", destination_service_name="{service_name}", response_code!~"5.*"}}[1m])) / sum(irate(istio_requests_total{{connection_security_policy="mutual_tls", reporter="destination", destination_service_name="{service_name}"}}[1m]))'
-        return self._query_metrics(query)
-        return percentage
+        query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_name="{service_name}"}}[1m]))/sum(container_spec_cpu_quota{{container_label_name="{service_name}"}}/container_spec_cpu_period{{container_label_name="{service_name}"}})'
+        return MetricsQuerier._query_metrics(query)
+            
 
-    def query_p99_latency_seconds(self, service_name) -> float:
+    
+    @staticmethod
+    def query_memory_usage_percentage(service_name: str) -> float:
         """
-        Queries the p99 latency metric.
+        Queries the memory usage percentage metric.
+
+        Args:
+            service_name (str): The name of the service.
 
         Returns:
-            float: P99 latency in ms.
+            float: Memory usage percentage in [0, 1].
         """
-        query = f'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{{connection_security_policy="mutual_tls", reporter="destination", destination_service_name="{service_name}"}}[1m])) by (le)) / 1000'
-        return self._query_metrics(query)
+        query = f'sum(container_memory_usage_bytes{{container_label_name="{service_name}"}}) / sum(container_spec_memory_limit_bytes{{container_label_name="{service_name}"}})'
+        return MetricsQuerier._query_metrics(query)
+
+
+    @staticmethod
+    def query_average_non_500_non_0_latency_seconds(service_name) -> float:
+        """
+        Queries the average latency metric.
+
+        Args:
+            service_name (str): The name of the service.
+
+        Returns:
+            float: Average latency in seconds.
+        """
+        query = f'sum(irate(istio_request_duration_milliseconds_sum{{connection_security_policy="mutual_tls", reporter="destination", response_codes!~"0|5.*", destination_service_name="{service_name}"}}[1m])) / sum(irate(istio_request_duration_milliseconds_count{{connection_security_policy="mutual_tls", reporter="destination", response_codes!~"0|5.*",destination_service_name="{service_name}"}}[1m])) / 1000'
+        try:
+            return MetricsQuerier._query_metrics(query)
+        except Exception as e:
+            return 0
     
-    def query_metrics(self, service_name: str) -> List[float]:
+    @staticmethod
+    def query_average_non_500_non_0_arrival_rate(service_name) -> float:
+        """
+        Queries the average arrival rate metric.
+
+        Args:
+            service_name (str): The name of the service.
+
+        Returns:
+            float: Average arrival rate in requests per second.
+        """
+        query = f'round(sum(irate(istio_requests_total{{response_code!~"0|5.*", connection_security_policy="mutual_tls",reporter="destination",destination_service_name=~"{service_name}"}}[5m])), 0.001)'
+        try:
+            return MetricsQuerier._query_metrics(query)
+        except Exception as e:
+            return 0
+    
+    @staticmethod
+    def query_cpu_and_memory_usage_percentage(service_name: str) -> List[float]:
         """
         Queries all metrics for a given service.
 
@@ -104,13 +135,11 @@ class MetricsQuerier:
         Returns:
             List[float]: List of float values representing the metrics.
         """
-        cpu_usage_percentage = self.query_cpu_usage_percentage(service_name)
-        memory_usage_percentage = self.query_memory_usage_percentage(service_name)
-        non_500_percentage = self.query_non_500_percentage(service_name)
-        p99_latency_seconds = self.query_p99_latency_seconds(service_name)
-        return [cpu_usage_percentage, memory_usage_percentage, non_500_percentage, p99_latency_seconds]
+        cpu_usage_percentage = MetricsQuerier.query_cpu_usage_percentage(service_name)
+        memory_usage_percentage = MetricsQuerier.query_memory_usage_percentage(service_name)
+        return [cpu_usage_percentage, memory_usage_percentage]
+    
 
 if __name__ == "__main__":
     prometheus_url = 'http://localhost:9090/api/v1/query'
-    metrics_querier = MetricsQuerier(prometheus_url)
-    print(metrics_querier.query_metrics('httpbin'))
+    print(MetricsQuerier.query_average_non_500_non_0_arrival_rate('httpbin'))

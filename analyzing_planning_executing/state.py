@@ -53,12 +53,19 @@ class Standby(State):
         Returns:
             Plan: The plan to set the concurrency limit.
         """
-        non_500_non_0_latency = MetricsQuerier.query_average_non_500_non_0_latency_seconds(service_name)
-        non_500_non_0_arrival_rate = MetricsQuerier.query_average_non_500_non_0_arrival_rate(service_name)
+        # non_500_non_0_latency = MetricsQuerier.query_average_non_500_non_0_latency_seconds(service_name)
+        # non_500_non_0_arrival_rate = MetricsQuerier.query_average_non_500_non_0_arrival_rate(service_name)
+        # old_limit = ConcurrencyLimitQuerier.query_concurrency_limit(service_name)
+        # logging.info(f"non_500_non_0_latency: {non_500_non_0_latency}, non_500_non_0_arrival_rate: {non_500_non_0_arrival_rate}")
+        # if non_500_non_0_latency == 0 or non_500_non_0_arrival_rate == 0:
+        #     return Plan(service_name, Plan.ACTION_SET_LIMIT, old_limit, 1)
+        # new_limit = int(non_500_non_0_arrival_rate * non_500_non_0_latency)
+        non_500_non_0_latency = MetricsQuerier.query_average_latency_seconds(service_name)
+        non_500_non_0_arrival_rate = MetricsQuerier.query_average_arrival_rate(service_name)
         old_limit = ConcurrencyLimitQuerier.query_concurrency_limit(service_name)
         logging.info(f"non_500_non_0_latency: {non_500_non_0_latency}, non_500_non_0_arrival_rate: {non_500_non_0_arrival_rate}")
         if non_500_non_0_latency == 0 or non_500_non_0_arrival_rate == 0:
-            return Plan(service_name, Plan.ACTION_SET_LIMIT, old_limit, old_limit)
+            return Plan(service_name, Plan.ACTION_SET_LIMIT, old_limit, 1)
         new_limit = int(non_500_non_0_arrival_rate * non_500_non_0_latency)
         return Plan(service_name, Plan.ACTION_SET_LIMIT, old_limit, new_limit)
 
@@ -102,7 +109,7 @@ class OverloadingAvoidance(State):
     @staticmethod
     def get_lower_limit_plan(service_name):
         old_limit = ConcurrencyLimitQuerier.query_concurrency_limit(service_name)
-        new_limit = int(0.75 * old_limit + 1)
+        new_limit = int(0.5 * old_limit + 1)
         return Plan(service_name, Plan.ACTION_LOWER_LIMIT, old_limit, new_limit)
 
     @staticmethod
@@ -130,7 +137,7 @@ class AggressiveProbing(State):
 
     def get_raise_limit_plan(service_name):
         old_limit = ConcurrencyLimitQuerier.query_concurrency_limit(service_name)
-        new_limit = 2 * old_limit
+        new_limit = old_limit * 1.2  + 20
         return Plan(service_name, Plan.ACTION_RAISE_LIMIT, old_limit, new_limit)
 
     @staticmethod

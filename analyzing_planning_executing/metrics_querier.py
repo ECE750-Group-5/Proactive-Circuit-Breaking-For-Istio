@@ -125,6 +125,42 @@ class MetricsQuerier:
             return 0
     
     @staticmethod
+    def query_average_arrival_rate(service_name) -> float:
+        """
+        Queries the average arrival rate metric.
+
+        Args:
+            service_name (str): The name of the service.
+
+        Returns:
+            float: Average arrival rate in requests per second.
+        """
+        query = f'round(sum(irate(istio_requests_total{{connection_security_policy="mutual_tls",reporter="destination",destination_service_name=~"{service_name}"}}[1m])), 0.001)'
+        try:
+            return MetricsQuerier._query_metrics(query)
+        except Exception as e:
+            return 0
+    
+    @staticmethod
+    def query_average_latency_seconds(service_name) -> float:
+        """
+        Queries the average latency metric.
+
+        Args:
+            service_name (str): The name of the service.
+
+        Returns:
+            float: Average latency in seconds.
+        """
+        query = f'sum(irate(istio_request_duration_milliseconds_sum{{connection_security_policy="mutual_tls", reporter="destination", response_codes!~"0|5.*", destination_service_name="{service_name}"}}[1m])) / sum(irate(istio_request_duration_milliseconds_count{{connection_security_policy="mutual_tls", reporter="destination",destination_service_name="{service_name}"}}[1m])) / 1000'
+        try:
+            return MetricsQuerier._query_metrics(query)
+        except Exception as e:
+            return 0
+        
+    
+    
+    @staticmethod
     def query_cpu_and_memory_usage_percentage(service_name: str) -> List[float]:
         """
         Queries all metrics for a given service.
@@ -142,4 +178,5 @@ class MetricsQuerier:
 
 if __name__ == "__main__":
     prometheus_url = 'http://localhost:9090/api/v1/query'
-    print(MetricsQuerier.query_average_non_500_non_0_arrival_rate('httpbin'))
+    print(MetricsQuerier.query_average_arrival_rate('httpbin'))
+    print(MetricsQuerier.query_average_latency_seconds('httpbin'))

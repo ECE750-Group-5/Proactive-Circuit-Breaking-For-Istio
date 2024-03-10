@@ -33,7 +33,7 @@
   <p align="center">
     Inspired by TCP Reno and the Adaptive Concurrency Limit feature of the Envoy Proxy
     <br />
-    <a href="https://docs.google.com/presentation/d/e/2PACX-1vSXUGH3mD93rpFue1jKB7sdrWB7V2XYQYAegnisOGFjAaB945cX5yPdAArM4oRm5SrgRrQA0ANQBCOD/pub?start=false&loop=false&delayms=3000"><strong>Explore our presentations »</strong></a>
+    <a href="https://docs.google.com/presentation/d/e/2PACX-1vSXUGH3mD93rpFue1jKB7sdrWB7V2XYQYAegnisOGFjAaB945cX5yPdAArM4oRm5SrgRrQA0ANQBCOD/pub?start=false&loop=false&delayms=3000"><strong>Explore our presentation »</strong></a>
     <br />
   </p>
 </div>
@@ -82,21 +82,29 @@ The Envoy Proxy has a feature called Adaptive Concurrency Limit, which is a real
 
 The Envoy implementation have to recalibrate the latency when the concurrency limit is 1 for every measure window, introducing parameters for extra tuning and artificial unavailability. 
 
+
+
+### Solution
 Our solution intends to solve this problem by mimicking the TCP Reno congestion control algorithm and use CPU utilization, a more immediate signal for saturation, as the feedback. 
 
-### High-Level Design
+#### High-Level Design
 <img src="https://lh7-us.googleusercontent.com/qkVgRBU2SrYRMWuea8pYPwMHsmJoafSCULGwaxCGeyU0xD7EdJFCCSKHwPIrP6_0E5BGmxhMVwRpOx8ZzW8Xix_2ZJdNqERM-jDklQc-Wf0Pi2hLpHW3inCiPTcU75tRUR9ASTmwqAo_RQ4QuMlN=s2048" alt="architecture" >
 
-### State Machine Algorithm
+#### State Machine Algorithm
 * Multiplicative Decrease Multiplicative Increase
 * Random Probing
 <img src="https://lh7-us.googleusercontent.com/NZfRzJL8VUw2ujsP9FkUMgIltP0vANbxGGg9SKvBH4ZHPmMD1TAHmKPobtxPKnRTnAXxAnuKKgvf9owk9SMrn8yqDSTkLpMyoKTpACwzxM7XNJQwF-5j9mdQS243swO7Fr0dEmhubjn8XBJ74wGB=s2048" alt="state machine" >
 
 ### Experiment
 #### Experiment Setup
+We have three experiment group: Group A with proactive Circuit Breaking (timeline 21:50 to 22:00), Group B without any Circuit Breaking (timeline 22:00 to 22:20), and Group C with static Circuit Breaking with a predefined concurrency limit of 10 (timeline 22:25 to 22:35). For each group, we used Fortio to generate a constant load of 140 QPS and a HttpBin container as our target service with a constant resource of 20m CPU amd 78 Mi memory. We used Prometheus and Grafana to monitor the CPU utilization and the QPS of the target service.
+
 #### Results
 <img src="https://lh7-us.googleusercontent.com/hFH1dR0oIpb-lGYJqqCdj8PddPoTnevS2NT7U8VzdqGg522wugPSmRdME8bvnSkJMvg_KVd6fnHL_SEjSbQvwM-rImTpDU3v1n-t8Co7P_XR2dYTW4ZuWhNlWTK_6-TUuZSYNm8z_lkl32-7lTzz=s2048" alt="CPU utilization" >
 <img src="https://lh7-us.googleusercontent.com/g09fpMZIXgKj3Kp8PZyC5RG_5dEvPfW1JJreogxO3HajbgCzORMIPys6T0sMdCD-Yfn26SrnN72G17-HQ-VGNzKnz3n7LUMGTPHrjKbd9Qx73zYYZPGDhgsQDxveCaYW9swyhvEBwcXXQ3cgYouC=s2048" alt="CPU utilization" >
+
+Both CPU and Latency improves. However, the latency didn't improve as much as we expected. We will need to further investigate the root cause of the high variance.
+
 
 ### Built With
 * [Istio](https://istio.io/)
@@ -111,10 +119,41 @@ Our solution intends to solve this problem by mimicking the TCP Reno congestion 
 <!-- GETTING STARTED -->
 ## Getting Started
 ### Prerequisites
+You need to have minikube installed. If you don't have it, you can install it by following the instructions [here](https://minikube.sigs.k8s.io/docs/start/).
+
 ### Installation
-<!-- USAGE EXAMPLES -->
-### Usage
+1. Install Prometheus Operator, Prometheus, CAdvisor, Fortio and Grafana
+In the root directory, run the following command:
+```sh
+chmod +x set-up.sh
+./set-up.sh
+```
+
+2. Configure the receiver for Prometheus AlertManager (Optional)
+ This is example for Slack. You can use other receivers as well.
+```sh
+kubectl apply -f monitoring/alert
+```
+
+1. Deploy Httpbin
+```sh
+kubectl apply -f httpbin/httpbin.yaml
+```
+
+4. Start the proactive circuit breaker MAPE loop
+```sh
+python3 analyzing_planning_executing/main.py
+```
+
+5. Start Fortio load test
+```sh
+kubectl exec "$FORTIO_POD" -c fortio -- /usr/bin/fortio load -c 140 -qps 140 -n 60000 -loglevel Warning http://httpbin:8000/get
+```
+
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
 
 ## Limitations
